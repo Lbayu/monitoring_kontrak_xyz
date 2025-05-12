@@ -36,8 +36,8 @@ if uploaded_file:
     try:
         le_vendor = joblib.load("le_vendor.pkl")
         le_jenis = joblib.load("le_jenis.pkl")
-        le_risk = joblib.load("le_risk.pkl")
-        le_priority = joblib.load("le_priority.pkl")
+        le_risk = joblib.load("le_risk_safe.pkl")
+        le_priority = joblib.load("le_priority_safe.pkl")
 
         df['nama_vendor_encoded'] = le_vendor.transform(df['nama_vendor'])
         df['jenis_pengadaan_encoded'] = le_jenis.transform(df['jenis_pengadaan'])
