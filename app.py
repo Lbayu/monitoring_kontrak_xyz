@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
+import xgboost as xgb  # <== Tambah ini
 
 st.set_page_config(page_title="Dashboard Monitoring Kontrak IT PMA", layout="wide")
 st.title("📊 Dashboard Monitoring Kontrak – IT PMA Bank XYZ")
@@ -56,15 +57,16 @@ if uploaded_file:
         st.error(f"❌ Gagal memuat atau menjalankan model Priority: {e}")
         df['Prioritas'] = "Model belum dimuat"
 
-    # ====== Model 3: Prediksi Durasi Kontrak ======
+    # ====== Model 3: Prediksi Durasi Kontrak (Pakai .json) ======
     with st.expander("🧪 Lihat Hasil Eksperimen Model 3 (Prediksi Durasi Kontrak)"):
         try:
-            model_duration = joblib.load("model_durasi_xgb.pkl")
-            feature_order = joblib.load("feature_order_model3.pkl")  # ⬅️ Urutan fitur saat training
+            model_duration = xgb.Booster()
+            model_duration.load_model("model_durasi_xgb.json")
+            feature_order = joblib.load("feature_order_model3.pkl")  # Urutan fitur waktu training
 
             df['Risk_encoded'] = le_risk.transform(df['Risk Level'])
 
-            # Tangani jika Prioritas hasil model (angka), convert ke string label
+            # Tangani jika Prioritas hasil model angka → label → encoded
             if df['Prioritas'].dtype in [np.int64, np.int32, np.float64]:
                 reverse_map = {v: k for k, v in zip(le_priority.classes_, le_priority.transform(le_priority.classes_))}
                 df['Prioritas_label'] = df['Prioritas'].map(reverse_map)
@@ -72,10 +74,9 @@ if uploaded_file:
             else:
                 df['Prioritas_encoded'] = le_priority.transform(df['Prioritas'])
 
-            # Susun ulang fitur sesuai urutan training
             df_model3_input = df[feature_order]
-
-            df['Predicted_Duration'] = model_duration.predict(df_model3_input)
+            dmatrix = xgb.DMatrix(df_model3_input)
+            df['Predicted_Duration'] = model_duration.predict(dmatrix)
 
             st.write("📉 Visualisasi Prediksi vs Aktual:")
             st.line_chart(df[['durasi_kontrak', 'Predicted_Duration']])
@@ -93,6 +94,13 @@ if uploaded_file:
     df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas'] == 'Tinggi')]
     st.write("Kontrak Risiko atau Prioritas Tinggi:")
     st.dataframe(df_alert, use_container_width=True)
+
+    # ====== Ekspor ke CSV ======
+    st.subheader("💾 Simpan ke CSV")
+    filename = st.text_input("Nama file output", "hasil_prediksi_kontrak.csv")
+    if st.button("📥 Simpan Data Hasil"):
+        df.to_csv(filename, index=False)
+        st.success(f"✅ File disimpan: {filename}")
 
 else:
     st.info("Silakan unggah file kontrak berformat CSV untuk memulai.")
