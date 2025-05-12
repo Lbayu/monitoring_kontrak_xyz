@@ -33,15 +33,21 @@ if uploaded_file:
     df['Risk Level'] = df.apply(classify_risk, axis=1)
 
     # ====== Model 2: Priority Level (ML) ======
+    # ====== Model 2: Priority Level (ML) ======
     try:
         model_priority = joblib.load("model_priority_rf.pkl")
-        fitur_model2 = ['nilai_kontrak', 'durasi_kontrak', 'delay_perpanjangan_kontrak']
+        le_vendor = joblib.load("le_vendor.pkl")
+        le_jenis = joblib.load("le_jenis.pkl")
 
-        st.success("✅ Model Priority berhasil dimuat.")
-        st.caption("🧠 Input ke model Priority:")
-        st.dataframe(df[fitur_model2].head())
+        # Encode ulang TANPA merusak data asli
+        df['nama_vendor_encoded'] = le_vendor.transform(df['nama_vendor'])
+        df['jenis_pengadaan_encoded'] = le_jenis.transform(df['jenis_pengadaan'])
+
+        fitur_model2 = ['nilai_kontrak', 'durasi_kontrak', 'delay_perpanjangan_kontrak',
+                        'jenis_pengadaan_encoded', 'nama_vendor_encoded']
 
         df['Prioritas'] = model_priority.predict(df[fitur_model2])
+        st.success("✅ Model Priority berhasil diprediksi.")
     except Exception as e:
         st.error(f"❌ Gagal memuat atau menjalankan model Priority: {e}")
         df['Prioritas'] = "Model belum dimuat"
