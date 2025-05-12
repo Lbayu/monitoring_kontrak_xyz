@@ -36,9 +36,9 @@ if uploaded_file:
     try:
         model_priority = joblib.load("model_priority_rf.pkl")
         fitur_model2 = ['nilai_kontrak', 'durasi_kontrak', 'delay_perpanjangan_kontrak']
-        df['Priority_Level'] = model_priority.predict(df[fitur_model2])
+        df['Prioritas'] = model_priority.predict(df[fitur_model2])
     except:
-        df['Priority_Level'] = "Model belum dimuat"
+        df['Prioritas'] = "Model belum dimuat"
 
     # ====== Predicted Duration (Model 3 - Eksperimen) ======
     with st.expander("🧪 Lihat Hasil Eksperimen Model 3 (Prediksi Durasi Kontrak)"):
