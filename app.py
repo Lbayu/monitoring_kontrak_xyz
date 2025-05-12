@@ -30,9 +30,10 @@ if uploaded_file:
             return "Sedang"
         else:
             return "Rendah"
+
     df['Risk Level'] = df.apply(classify_risk, axis=1)
 
-    # ====== Load Encoders ======
+    # ====== Load Encoders & Transform ======
     try:
         le_vendor = joblib.load("le_vendor.pkl")
         le_jenis = joblib.load("le_jenis.pkl")
@@ -55,13 +56,20 @@ if uploaded_file:
         st.error(f"❌ Gagal memuat atau menjalankan model Priority: {e}")
         df['Prioritas'] = "Model belum dimuat"
 
-    # ====== Model 3: Predicted Duration (XGBoost) ======
+    # ====== Model 3: Prediksi Durasi Kontrak ======
     with st.expander("🧪 Lihat Hasil Eksperimen Model 3 (Prediksi Durasi Kontrak)"):
         try:
             model_duration = joblib.load("model_durasi_xgb.pkl")
 
             df['Risk_encoded'] = le_risk.transform(df['Risk Level'])
-            df['Prioritas_encoded'] = le_priority.transform(df['Prioritas'])
+
+            # Tangani jika Prioritas hasil model (angka), convert ke string label
+            if df['Prioritas'].dtype in [np.int64, np.int32, np.float64]:
+                reverse_map = {v: k for k, v in zip(le_priority.classes_, le_priority.transform(le_priority.classes_))}
+                df['Prioritas_label'] = df['Prioritas'].map(reverse_map)
+                df['Prioritas_encoded'] = le_priority.transform(df['Prioritas_label'])
+            else:
+                df['Prioritas_encoded'] = le_priority.transform(df['Prioritas'])
 
             fitur_model3 = [
                 'delay_perpanjangan_kontrak', 'nilai_kontrak',
@@ -70,16 +78,19 @@ if uploaded_file:
                 'Risk_encoded', 'Prioritas_encoded'
             ]
             df['Predicted_Duration'] = model_duration.predict(df[fitur_model3])
+
             st.write("📉 Visualisasi Prediksi vs Aktual:")
             st.line_chart(df[['durasi_kontrak', 'Predicted_Duration']])
+
         except Exception as e:
             st.warning(f"Model 3 belum tersedia atau gagal diproses: {e}")
 
-    # ====== Visualisasi Dasbor Utama ======
+    # ====== Tabel Monitoring ======
     st.subheader("📊 Tabel Monitoring Kontrak")
     st.dataframe(df[['nama_vendor', 'jenis_pengadaan', 'nilai_kontrak', 'durasi_kontrak',
                      'delay_perpanjangan_kontrak', 'Risk Level', 'Prioritas']], use_container_width=True)
 
+    # ====== Notifikasi Risiko & Prioritas ======
     st.subheader("🔔 Notifikasi Otomatis")
     df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas'] == 'Tinggi')]
     st.write("Kontrak Risiko atau Prioritas Tinggi:")
