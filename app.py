@@ -36,8 +36,14 @@ if uploaded_file:
     try:
         model_priority = joblib.load("model_priority_rf.pkl")
         fitur_model2 = ['nilai_kontrak', 'durasi_kontrak', 'delay_perpanjangan_kontrak']
+
+        st.success("✅ Model Priority berhasil dimuat.")
+        st.caption("🧠 Input ke model Priority:")
+        st.dataframe(df[fitur_model2].head())
+
         df['Prioritas'] = model_priority.predict(df[fitur_model2])
-    except:
+    except Exception as e:
+        st.error(f"❌ Gagal memuat atau menjalankan model Priority: {e}")
         df['Prioritas'] = "Model belum dimuat"
 
     # ====== Predicted Duration (Model 3 - Eksperimen) ======
