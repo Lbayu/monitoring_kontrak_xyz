@@ -60,6 +60,7 @@ if uploaded_file:
     with st.expander("🧪 Lihat Hasil Eksperimen Model 3 (Prediksi Durasi Kontrak)"):
         try:
             model_duration = joblib.load("model_durasi_xgb.pkl")
+            feature_order = joblib.load("feature_order_model3.pkl")  # ⬅️ Urutan fitur saat training
 
             df['Risk_encoded'] = le_risk.transform(df['Risk Level'])
 
@@ -71,13 +72,10 @@ if uploaded_file:
             else:
                 df['Prioritas_encoded'] = le_priority.transform(df['Prioritas'])
 
-            fitur_model3 = [
-                'delay_perpanjangan_kontrak', 'nilai_kontrak',
-                'ratio_delay_durasi', 'nilai_per_hari',
-                'nama_vendor_encoded', 'jenis_pengadaan_encoded',
-                'Risk_encoded', 'Prioritas_encoded'
-            ]
-            df['Predicted_Duration'] = model_duration.predict(df[fitur_model3])
+            # Susun ulang fitur sesuai urutan training
+            df_model3_input = df[feature_order]
+
+            df['Predicted_Duration'] = model_duration.predict(df_model3_input)
 
             st.write("📉 Visualisasi Prediksi vs Aktual:")
             st.line_chart(df[['durasi_kontrak', 'Predicted_Duration']])
