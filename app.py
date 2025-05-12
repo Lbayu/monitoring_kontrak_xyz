@@ -24,13 +24,13 @@ if uploaded_file:
 
     # ====== Model 1: Risk Level (Rule-based) ======
     def classify_risk(row):
-        if row['nilai_kontrak'] > 5e9 or row['durasi_kontrak'] > 300 or row['delay_perpanjangan_kontrak'] > 30:
+        if row['nilai_kontrak'] > 10e9 or row['durasi_kontrak'] > 300 or row['delay_perpanjangan_kontrak'] > 30:
             return "Tinggi"
-        elif row['nilai_kontrak'] > 2e9 or row['durasi_kontrak'] > 150 or row['delay_perpanjangan_kontrak'] > 0:
+        elif row['nilai_kontrak'] > 5e9 or row['durasi_kontrak'] > 180 or row['delay_perpanjangan_kontrak'] > 15:
             return "Sedang"
         else:
             return "Rendah"
-    df['Risk_Level'] = df.apply(classify_risk, axis=1)
+    df['Risk Level'] = df.apply(classify_risk, axis=1)
 
     # ====== Model 2: Priority Level (ML) ======
     try:
@@ -55,10 +55,10 @@ if uploaded_file:
     # ====== Visualisasi Dasbor Utama ======
     st.subheader("📊 Tabel Monitoring Kontrak")
     st.dataframe(df[['nama_vendor', 'jenis_pengadaan', 'nilai_kontrak', 'durasi_kontrak',
-                     'delay_perpanjangan_kontrak', 'Risk_Level', 'Priority_Level']], use_container_width=True)
+                     'delay_perpanjangan_kontrak', 'Risk Level', 'Prioritas']], use_container_width=True)
 
     st.subheader("🔔 Notifikasi Otomatis")
-    df_alert = df[(df['Risk_Level'] == 'Tinggi') | (df['Priority_Level'] == 'Tinggi')]
+    df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas'] == 'Tinggi')]
     st.write("Kontrak Risiko atau Prioritas Tinggi:")
     st.dataframe(df_alert, use_container_width=True)
 
