@@ -16,7 +16,7 @@ if uploaded_file:
     st.subheader("🔍 Preview Data Kontrak")
     st.dataframe(df.head(), use_container_width=True)
 
-    # === Feature Engineering (Simplified) ===
+    # === Feature Engineering ===
     df['ratio_delay_durasi'] = df['delay_perpanjangan_kontrak'] / df['durasi_kontrak']
     df['nilai_per_hari'] = df['nilai_kontrak'] / df['durasi_kontrak']
     df.replace([np.inf, -np.inf], 0, inplace=True)
@@ -32,37 +32,48 @@ if uploaded_file:
             return "Rendah"
     df['Risk Level'] = df.apply(classify_risk, axis=1)
 
-    # ====== Model 2: Priority Level (ML) ======
+    # ====== Load Encoders ======
+    try:
+        le_vendor = joblib.load("le_vendor.pkl")
+        le_jenis = joblib.load("le_jenis.pkl")
+        le_risk = joblib.load("le_risk.pkl")
+        le_priority = joblib.load("le_priority.pkl")
+
+        df['nama_vendor_encoded'] = le_vendor.transform(df['nama_vendor'])
+        df['jenis_pengadaan_encoded'] = le_jenis.transform(df['jenis_pengadaan'])
+    except Exception as e:
+        st.error(f"❌ Gagal memuat encoder: {e}")
+
     # ====== Model 2: Priority Level (ML) ======
     try:
         model_priority = joblib.load("model_priority_rf.pkl")
-        le_vendor = joblib.load("le_vendor.pkl")
-        le_jenis = joblib.load("le_jenis.pkl")
-
-        # Encode ulang TANPA merusak data asli
-        df['nama_vendor_encoded'] = le_vendor.transform(df['nama_vendor'])
-        df['jenis_pengadaan_encoded'] = le_jenis.transform(df['jenis_pengadaan'])
-
         fitur_model2 = ['nilai_kontrak', 'durasi_kontrak', 'delay_perpanjangan_kontrak',
                         'jenis_pengadaan_encoded', 'nama_vendor_encoded']
-
         df['Prioritas'] = model_priority.predict(df[fitur_model2])
         st.success("✅ Model Priority berhasil diprediksi.")
     except Exception as e:
         st.error(f"❌ Gagal memuat atau menjalankan model Priority: {e}")
         df['Prioritas'] = "Model belum dimuat"
 
-    # ====== Predicted Duration (Model 3 - Eksperimen) ======
+    # ====== Model 3: Predicted Duration (XGBoost) ======
     with st.expander("🧪 Lihat Hasil Eksperimen Model 3 (Prediksi Durasi Kontrak)"):
         try:
             model_duration = joblib.load("model_durasi_xgb.pkl")
-            fitur_model3 = ['delay_perpanjangan_kontrak', 'nilai_kontrak', 'ratio_delay_durasi', 'nilai_per_hari']
+
+            df['Risk_encoded'] = le_risk.transform(df['Risk Level'])
+            df['Prioritas_encoded'] = le_priority.transform(df['Prioritas'])
+
+            fitur_model3 = [
+                'delay_perpanjangan_kontrak', 'nilai_kontrak',
+                'ratio_delay_durasi', 'nilai_per_hari',
+                'nama_vendor_encoded', 'jenis_pengadaan_encoded',
+                'Risk_encoded', 'Prioritas_encoded'
+            ]
             df['Predicted_Duration'] = model_duration.predict(df[fitur_model3])
             st.write("📉 Visualisasi Prediksi vs Aktual:")
             st.line_chart(df[['durasi_kontrak', 'Predicted_Duration']])
-            st.caption("⚠️ Catatan: Model ini hanya untuk keperluan evaluatif, bukan untuk digunakan dalam sistem produksi.")
-        except:
-            st.warning("Model 3 belum tersedia. Pastikan file model_durasi_xgb.pkl tersedia di folder.")
+        except Exception as e:
+            st.warning(f"Model 3 belum tersedia atau gagal diproses: {e}")
 
     # ====== Visualisasi Dasbor Utama ======
     st.subheader("📊 Tabel Monitoring Kontrak")
