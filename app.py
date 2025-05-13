@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import numpy as np
+import xgboost as xgb  # <== Tambah ini
 
 st.set_page_config(page_title="Dashboard Monitoring Kontrak IT PMA", layout="wide")
 st.title("📊 Dashboard Monitoring Kontrak – IT PMA Bank XYZ")
@@ -33,19 +34,19 @@ if uploaded_file:
 
     df['Risk Level'] = df.apply(classify_risk, axis=1)
 
-    # ====== Load Encoders ======
+    # ====== Load Encoders & Transform ======
     try:
         le_vendor = joblib.load("le_vendor.pkl")
         le_jenis = joblib.load("le_jenis.pkl")
         le_risk = joblib.load("le_risk_safe.pkl")
-        le_priority = joblib.load("le_priority.pkl")
+        le_priority = joblib.load("le_priority_safe.pkl")
 
         df['nama_vendor_encoded'] = le_vendor.transform(df['nama_vendor'])
         df['jenis_pengadaan_encoded'] = le_jenis.transform(df['jenis_pengadaan'])
     except Exception as e:
         st.error(f"❌ Gagal memuat encoder: {e}")
 
-    # ====== Model 2: Priority Level (ML) ======
+     # ====== Model 2: Priority Level (ML) ======
     try:
         model_priority = joblib.load("model_priority_rf.pkl")
         fitur_model2 = ['nilai_kontrak', 'durasi_kontrak', 'delay_perpanjangan_kontrak',
@@ -61,44 +62,50 @@ if uploaded_file:
         st.error(f"❌ Gagal memuat atau menjalankan model Priority: {e}")
         df['Prioritas_Label'] = "Model belum dimuat"
 
-    # ====== Model 3: Prediksi Durasi Kontrak ======
+    # ====== Model 3: Prediksi Durasi Kontrak (Pakai .json) ======
     with st.expander("🧪 Lihat Hasil Eksperimen Model 3 (Prediksi Durasi Kontrak)"):
         try:
-            model_duration = joblib.load("model_durasi_xgb.pkl")
-            feature_order = joblib.load("feature_order_model3.pkl")
+            model_duration = xgb.Booster()
+            model_duration.load_model("model_durasi_xgb.json")
+            feature_order = joblib.load("feature_order_model3.pkl")  # Urutan fitur waktu training
 
             df['Risk_encoded'] = le_risk.transform(df['Risk Level'])
-            df['Prioritas_encoded'] = le_priority.transform(df['Prioritas_Label'])
+
+            # Tangani jika Prioritas hasil model angka → label → encoded
+            if df['Prioritas'].dtype in [np.int64, np.int32, np.float64]:
+                reverse_map = {v: k for k, v in zip(le_priority.classes_, le_priority.transform(le_priority.classes_))}
+                df['Prioritas_label'] = df['Prioritas'].map(reverse_map)
+                df['Prioritas_encoded'] = le_priority.transform(df['Prioritas_label'])
+            else:
+                df['Prioritas_encoded'] = le_priority.transform(df['Prioritas'])
 
             df_model3_input = df[feature_order]
-            df['Predicted_Duration'] = model_duration.predict(df_model3_input)
+            dmatrix = xgb.DMatrix(df_model3_input)
+            df['Predicted_Duration'] = model_duration.predict(dmatrix)
 
             st.write("📉 Visualisasi Prediksi vs Aktual:")
             st.line_chart(df[['durasi_kontrak', 'Predicted_Duration']])
+
         except Exception as e:
             st.warning(f"Model 3 belum tersedia atau gagal diproses: {e}")
 
     # ====== Tabel Monitoring ======
     st.subheader("📊 Tabel Monitoring Kontrak")
     st.dataframe(df[['nama_vendor', 'jenis_pengadaan', 'nilai_kontrak', 'durasi_kontrak',
-                     'delay_perpanjangan_kontrak', 'Risk Level', 'Prioritas_Label']], use_container_width=True)
+                     'delay_perpanjangan_kontrak', 'Risk Level', 'Prioritas']], use_container_width=True)
 
     # ====== Notifikasi Risiko & Prioritas ======
     st.subheader("🔔 Notifikasi Otomatis")
-    df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas_Label'] == 'Tinggi')]
+    df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas'] == 'Tinggi')]
     st.write("Kontrak Risiko atau Prioritas Tinggi:")
     st.dataframe(df_alert, use_container_width=True)
 
-    # ====== Simpan ke CSV ======
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⬇️ Simpan Hasil")
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button(
-        label="💾 Download Hasil ke CSV",
-        data=csv,
-        file_name="hasil_monitoring_kontrak.csv",
-        mime="text/csv"
-    )
+    # ====== Ekspor ke CSV ======
+    st.subheader("💾 Simpan ke CSV")
+    filename = st.text_input("Nama file output", "hasil_prediksi_kontrak.csv")
+    if st.button("📥 Simpan Data Hasil"):
+        df.to_csv(filename, index=False)
+        st.success(f"✅ File disimpan: {filename}")
 
 else:
     st.info("Silakan unggah file kontrak berformat CSV untuk memulai.")
