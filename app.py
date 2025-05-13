@@ -92,11 +92,11 @@ if uploaded_file:
     # ====== Tabel Monitoring ======
     st.subheader("📊 Tabel Monitoring Kontrak")
     st.dataframe(df[['nama_vendor', 'jenis_pengadaan', 'nilai_kontrak', 'durasi_kontrak',
-                     'delay_perpanjangan_kontrak', 'Risk Level', 'Prioritas']], use_container_width=True)
+                     'delay_perpanjangan_kontrak', 'Risk Level', 'Prioritas_label']], use_container_width=True)
 
     # ====== Notifikasi Risiko & Prioritas ======
     st.subheader("🔔 Notifikasi Otomatis")
-    df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas'] == 'Tinggi')]
+    df_alert = df[(df['Risk Level'] == 'Tinggi') | (df['Prioritas_label'] == 'Tinggi')]
     st.write("Kontrak Risiko atau Prioritas Tinggi:")
     st.dataframe(df_alert, use_container_width=True)
 
